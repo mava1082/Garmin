@@ -18,16 +18,30 @@ träningsråd för dagen.
 | **Insikter** | Automatiska varningar och tips: för snabb ökning, hög akut belastning, för mycket tid i zon 3, sjunkande HRV, sömnbrist, veckomål. |
 | **Rekord och senaste pass** | Längsta pass, snabbaste snittempo, största veckan och en tabell över senaste passen. |
 
-## Kom igång
+## Kom igång (ingen kodning behövs)
+
+1. **Installera Python** (gratis, en gång) från [python.org/downloads](https://www.python.org/downloads/).
+   *Windows:* kryssa i **"Add python.exe to PATH"** längst ner i första installationsrutan.
+2. **Ladda ner dashboarden** som en ZIP-fil från GitHub (gröna knappen **Code → Download ZIP**)
+   och packa upp den, till exempel i mappen Dokument.
+3. **Starta** genom att dubbelklicka på
+   - **`start.bat`** på Windows. Om Windows varnar, klicka *Mer information → Kör ändå*.
+   - **`start.command`** på Mac. Om Mac säger att filen inte kan öppnas: öppna *Systeminställningar → Integritet och säkerhet*, scrolla ner och klicka *Öppna ändå*. Dubbelklicka sedan på filen igen.
+
+   Första gången tar det ett par minuter. Sedan öppnas dashboarden i webbläsaren. Låt det svarta
+   fönstret vara öppet medan du använder den, och stäng det när du är klar.
+4. **Koppla Garmin**: klicka på den blå knappen **Koppla Garmin**, klistra in din Personal API Key
+   och tryck **Koppla**. Dashboarden hämtar ditt senaste år. Det kan ta några minuter.
+
+Nästa gång dubbelklickar du bara på startfilen och trycker **Synka** för att hämta nya pass.
+
+### För utvecklare
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python -m garmin_dashboard          # öppna http://127.0.0.1:8000
+pip install -r requirements-dev.txt
+python -m garmin_dashboard --open
 ```
-
-Utan inställningar körs **demoläget** med ett års syntetisk träning, så du ser direkt hur allt fungerar.
 
 ## Koppla din Garmin-data
 
@@ -37,7 +51,7 @@ Garmins officiella, kostnadsfria API för din egen data. Det släpptes i oktober
 
 1. Logga in på Garmin Connect på webben och skapa en **Personal API Key** under Garmins
    utvecklarsidor. Välj giltighetstid (30 dagar–1 år). Nyckeln visas bara en gång, så spara den.
-2. Lägg den i `.env`:
+2. Klistra in den via **Koppla Garmin** i dashboarden, eller lägg den själv i `.env`:
    ```ini
    GARMIN_PERSONAL_API_KEY=din-nyckel
    ```

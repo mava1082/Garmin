@@ -35,11 +35,17 @@ class PersonalApiSource:
             self._key = resolve_api_key(cfg.personal_api_key)
             self._auth = authenticator or PersonalApiAuthenticator()
             token = self._auth.obtain_token(self._key)
-        except Exception as e:  # bad/expired key (HttpError) or no network
-            raise RuntimeError(
-                f"Kunde inte hämta token med Personal API-nyckeln: {e}. Kontrollera GARMIN_PERSONAL_API_KEY "
-                "i .env, att nyckeln inte har gått ut och att datorn når personal.connectapi.garmin.com."
-            ) from e
+        except Exception as e:
+            status = getattr(e, "status_code", None)
+            if status in (400, 401, 403):
+                msg = ("Garmin godkände inte nyckeln. Kontrollera att du klistrat in hela nyckeln "
+                       "och att den inte har gått ut.")
+            elif status is not None:
+                msg = f"Garmin svarade med ett fel (HTTP {status}). Försök igen om en stund."
+            else:
+                msg = "Kunde inte nå Garmin. Kontrollera internetanslutningen och försök igen."
+            log.warning("Token exchange failed: %s", e)
+            raise RuntimeError(msg) from e
         self.client = GarminPersonalApiClient(token.access_token)
 
     def _call(self, fn: Callable[..., Any], *args, **kwargs) -> Any:

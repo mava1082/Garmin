@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .analytics import build_dashboard
-from .config import config
+from .config import config, save_env
 from .db import Database
 from .sync import sync
 
@@ -27,6 +27,10 @@ STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="Garmin träningsdashboard")
 db = Database(config.db_path)
 _sync_lock = threading.Lock()
+
+
+class SetupIn(BaseModel):
+    api_key: str = Field(min_length=8, max_length=4096)
 
 
 class SettingsIn(BaseModel):
@@ -70,6 +74,23 @@ async def trigger_sync(days: int = 180, full: bool = False) -> dict:
     return await run_in_threadpool(_run_sync, max(1, min(days, 730)), full)
 
 
+@app.post("/api/setup")
+def setup(body: SetupIn) -> dict:
+    """Connect the Personal API from the browser: verify the key, then store it in .env."""
+    from types import SimpleNamespace
+
+    from .sources.personal_api import PersonalApiSource
+
+    key = body.api_key.strip()
+    try:
+        PersonalApiSource(SimpleNamespace(personal_api_key=key))
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
+    save_env({"GARMIN_PERSONAL_API_KEY": key, "GARMIN_SOURCE": "personal_api"})
+    config.personal_api_key, config.source = key, "personal_api"
+    return {"ok": True, "source": config.source}
+
+
 @app.get("/api/settings")
 def get_settings() -> dict:
     return db.settings()
@@ -93,11 +114,22 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 def main() -> None:
+    import argparse
+    import webbrowser
+
     import uvicorn
 
+    parser = argparse.ArgumentParser(description="Starta träningsdashboarden")
+    parser.add_argument("--open", action="store_true", help="öppna webbläsaren automatiskt")
+    args = parser.parse_args()
+
+    url = f"http://{config.host}:{config.port}"
     logging.basicConfig(level=logging.INFO)
-    print(f"Dashboard: http://{config.host}:{config.port}  (källa: {config.source})")
-    uvicorn.run(app, host=config.host, port=config.port)
+    print(f"\nDashboarden körs på {url}  (källa: {config.source})")
+    print("Låt det här fönstret vara öppet. Stäng det för att avsluta.\n")
+    if args.open:
+        threading.Timer(2.0, webbrowser.open, args=[url]).start()
+    uvicorn.run(app, host=config.host, port=config.port, log_level="warning")
 
 
 if __name__ == "__main__":

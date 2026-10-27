@@ -92,3 +92,39 @@ def test_token_is_refreshed_once_on_401():
     src.client.update_bearer_token = lambda t: tokens.append(t)
     assert src._call(flaky) == "ok"
     assert tokens == [True, "new"]
+
+
+def test_setup_endpoint_saves_key(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import garmin_dashboard.config as cfg_mod
+    import garmin_dashboard.server as server
+    import garmin_dashboard.sources.personal_api as pa
+
+    env = tmp_path / ".env"
+    env.write_text("# GARMIN_SOURCE=demo\nPORT=8000\n")
+    monkeypatch.setattr(server, "save_env", lambda values: cfg_mod.save_env(values, env))
+    monkeypatch.setattr(pa.PersonalApiSource, "__init__", lambda self, cfg: None)
+    monkeypatch.setattr(server.config, "source", "demo")
+    monkeypatch.setattr(server.config, "personal_api_key", None)
+
+    r = TestClient(server.app).post("/api/setup", json={"api_key": "  my-secret-key  "})
+    assert r.status_code == 200
+    text = env.read_text()
+    assert "GARMIN_SOURCE=personal_api" in text and "GARMIN_PERSONAL_API_KEY=my-secret-key" in text
+    assert "PORT=8000" in text
+    assert server.config.source == "personal_api" and server.config.personal_api_key == "my-secret-key"
+
+
+def test_invalid_key_gives_friendly_error():
+    import pytest
+
+    class Err(Exception):
+        status_code = 401
+
+    class Auth:
+        def obtain_token(self, key):
+            raise Err("HTTP 401")
+
+    with pytest.raises(RuntimeError, match="godkände inte nyckeln"):
+        PersonalApiSource(SimpleNamespace(personal_api_key="bad-key"), authenticator=Auth())

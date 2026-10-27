@@ -27,6 +27,10 @@
   </header>
 
   <div id="error" class="banner" hidden></div>
+  <div id="demoBanner" class="banner info" hidden>
+    <span>Du tittar på <b>påhittad demodata</b>. Koppla ditt Garmin-konto för att se din egen träning.</span>
+    <button class="primary" id="connectBtn">Koppla Garmin</button>
+  </div>
 
   <main>
     <section class="hero card" id="readiness">
@@ -140,9 +144,30 @@
         <select name="sex"><option value="male">Man</option><option value="female">Kvinna</option></select>
       </label>
       <label>Veckomål (timmar) <input type="number" name="weekly_goal_hours" min="0" max="40" step="0.5" required></label>
+      <p class="small"><a href="#" id="changeKeyLink">Byt Garmin API-nyckel…</a></p>
       <div class="dialog-actions">
         <button value="cancel" formnovalidate>Avbryt</button>
         <button value="save" class="primary">Spara</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="setupDialog">
+    <form id="setupForm">
+      <h3>Koppla ditt Garmin-konto</h3>
+      <ol class="steps">
+        <li>Hämta din <b>Personal API Key</b> från Garmins utvecklarsida, där du skapade den.
+          Har du inte sparat den? Skapa en ny där (den visas bara en gång).</li>
+        <li>Klistra in nyckeln här nedanför och tryck <b>Koppla</b>.</li>
+      </ol>
+      <label>Personal API Key
+        <input type="password" name="api_key" autocomplete="off" required minlength="8" placeholder="Klistra in nyckeln här">
+      </label>
+      <p class="muted small">Nyckeln sparas bara på din egen dator, i filen <code>.env</code> i dashboardens mapp.</p>
+      <p id="setupStatus" class="small" role="status"></p>
+      <div class="dialog-actions">
+        <button type="button" id="setupCancel">Avbryt</button>
+        <button type="submit" class="primary" id="setupSubmit">Koppla</button>
       </div>
     </form>
   </dialog>

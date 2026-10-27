@@ -25,7 +25,7 @@ def _load_dotenv(path: Path) -> None:
 _load_dotenv(ROOT / ".env")
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
     # demo | personal_api | garminconnect. Defaults to personal_api when a key is set.
     source: str = os.environ.get("GARMIN_SOURCE") or (
@@ -45,3 +45,18 @@ class Config:
 
 
 config = Config()
+
+
+def save_env(values: dict[str, str], path: Path = ROOT / ".env") -> None:
+    """Write/replace KEY=value lines in .env, keeping everything else as is."""
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    pending = dict(values)
+    for i, line in enumerate(lines):
+        key = line.split("=", 1)[0].strip().lstrip("# ").strip()
+        if key in pending and "=" in line:
+            lines[i] = f"{key}={pending.pop(key)}"
+    lines += [f"{k}={v}" for k, v in pending.items()]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if os.name == "posix":
+        path.chmod(0o600)  # the file holds an API key
+    os.environ.update(values)

@@ -78,9 +78,17 @@ button:disabled { opacity: .6; cursor: progress; }
 .segmented button[aria-pressed="true"] { background: var(--surface); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
 
 .banner {
-  max-width: 1352px; margin: 8px auto; padding: 10px 14px; border-radius: 8px;
+  margin: 8px max(24px, calc((100% - 1352px) / 2)); padding: 10px 14px; border-radius: 8px;
   background: color-mix(in srgb, var(--critical) 12%, var(--surface)); border: 1px solid var(--critical);
 }
+
+.banner.info {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border-color: var(--accent);
+}
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: .88rem; color: var(--text-2); }
+code { font-size: .85em; background: var(--page); padding: 1px 4px; border-radius: 4px; }
+a { color: var(--accent); }
 
 main { max-width: 1400px; margin: 0 auto; padding: 8px 24px 40px; display: grid; gap: 16px; }
 
@@ -132,6 +140,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 8px 24px 40px; display: grid;
   .span-2, .span-3 { grid-column: auto; }
 }
 @media (max-width: 600px) {
+  .banner { margin-left: 16px; margin-right: 16px; }
   .topbar, main { padding-left: 16px; padding-right: 16px; }
 }
 
@@ -173,7 +182,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* dialog */
 dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); padding: 22px; width: min(380px, 92vw); }
 dialog::backdrop { background: rgba(0, 0, 0, .4); }
-dialog form { display: grid; gap: 12px; }
+dialog form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+#setupStatus { overflow-wrap: anywhere; margin: 0; }
+#setupStatus:empty { display: none; }
 dialog label { display: grid; gap: 4px; font-size: .85rem; color: var(--text-2); }
 dialog input, dialog select { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

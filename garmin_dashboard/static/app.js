@@ -44,6 +44,7 @@ function render() {
   const s = d.settings;
   const src = { demo: "demodata", personal_api: "Garmin Personal API", garminconnect: "Garmin Connect" }[d.source] || d.source;
   $("#meta").textContent = `${src} · ${d.counts.activities} pass · senast synkad ${s.last_sync ? s.last_sync.replace("T", " ").slice(0, 16) : "aldrig"}`;
+  $("#demoBanner").hidden = d.source !== "demo";
   renderReadiness(d.readiness);
   renderTiles(d);
   renderInsights(d.insights);
@@ -299,6 +300,37 @@ dialog.addEventListener("close", async () => {
     await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     load();
   } catch (e) { showError(e.message); }
+});
+
+// --- connect Garmin -----------------------------------------------------
+const setup = $("#setupDialog");
+function openSetup() {
+  $("#setupStatus").textContent = "";
+  $("#setupSubmit").disabled = false;
+  setup.showModal();
+}
+$("#connectBtn").addEventListener("click", openSetup);
+$("#changeKeyLink").addEventListener("click", (e) => { e.preventDefault(); dialog.close(); openSetup(); });
+$("#setupCancel").addEventListener("click", () => setup.close());
+$("#setupForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const status = $("#setupStatus");
+  const submit = $("#setupSubmit");
+  submit.disabled = true;
+  status.textContent = "Kontrollerar nyckeln hos Garmin…";
+  try {
+    await api("/api/setup", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: e.target.api_key.value }) });
+    status.textContent = "Nyckeln fungerar! Hämtar ditt senaste år från Garmin – det kan ta några minuter…";
+    const r = await api("/api/sync?days=365&full=true", { method: "POST" });
+    status.textContent = `Klart: ${r.activities} pass hämtade.`;
+    e.target.reset();
+    await load();
+    setTimeout(() => setup.close(), 1200);
+  } catch (err) {
+    status.textContent = err.message;
+    submit.disabled = false;
+  }
 });
 
 function applyTheme(theme) {

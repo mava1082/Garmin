@@ -71,14 +71,17 @@ def connect_activity(a: dict[str, Any]) -> dict[str, Any]:
 
 
 def daily_summary_fields(s: dict[str, Any]) -> dict[str, Any]:
-    """Fields from a usersummary daily summary."""
+    """Fields from a daily summary: flat usersummary format or the nested v2 dailysummaries format."""
     return {
-        "resting_hr": s.get("restingHeartRate"),
-        "steps": s.get("totalSteps"),
-        "stress_avg": s.get("averageStressLevel"),
-        "body_battery_high": s.get("bodyBatteryHighestValue"),
-        "body_battery_low": s.get("bodyBatteryLowestValue"),
+        "resting_hr": s.get("restingHeartRate") or dig(s, "heartRate", "restingValue"),
+        "steps": s.get("totalSteps") or dig(s, "movement", "steps", "value"),
+        "stress_avg": s.get("averageStressLevel") or dig(s, "stress", "avgLevel"),
+        "body_battery_high": s.get("bodyBatteryHighestValue") or dig(s, "bodyBattery", "maxValue"),
+        "body_battery_low": s.get("bodyBatteryLowestValue") or dig(s, "bodyBattery", "minValue"),
     }
+
+
+DAILY_SUMMARY_KEYS = ("restingHeartRate", "totalSteps", "heartRate", "movement", "bodyBattery", "stress")
 
 
 def sleep_fields(s: dict[str, Any]) -> dict[str, Any]:

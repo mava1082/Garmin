@@ -57,8 +57,8 @@ jobs:
           path: |
             data
             ~/.config/garmin
-          key: garmin-db-v2-${{ github.run_id }}
-          restore-keys: garmin-db-v2-
+          key: garmin-db-v3-${{ github.run_id }}
+          restore-keys: garmin-db-v3-
 
       - name: Felsökning (struktur på Garmins svar, inga värden)
         if: ${{ inputs.debug }}

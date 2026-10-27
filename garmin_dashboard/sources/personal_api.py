@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Any, Callable
 
 from .connect_format import (
-    connect_activity, daily_summary_fields, find_records, hrv_value, record_date, sleep_fields,
+    DAILY_SUMMARY_KEYS, connect_activity, daily_summary_fields, find_records, hrv_value, record_date, sleep_fields,
 )
 
 log = logging.getLogger(__name__)
@@ -114,7 +114,7 @@ class PersonalApiSource:
             summaries = self._try(f"dailysummaries {label}", self.client.get_daily_summaries, lo, hi)
             if summaries is FAILED:
                 failed.update(chunk)
-            for rec in find_records(summaries, "restingHeartRate", "totalSteps"):
+            for rec in find_records(summaries, *DAILY_SUMMARY_KEYS):
                 if (r := rows.get(record_date(rec))) is not None:
                     r.update({k: v for k, v in daily_summary_fields(rec).items() if v is not None})
 

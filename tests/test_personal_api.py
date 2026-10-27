@@ -21,8 +21,11 @@ class FakeClient:
 
     def get_daily_summaries(self, lo, hi):
         days = [lo + timedelta(days=i) for i in range((hi - lo).days + 1)]
-        return {"data": [{"calendarDate": d.isoformat(), "restingHeartRate": 48, "totalSteps": 9000,
-                          "bodyBatteryHighestValue": 80} for d in days]}
+        # Shape of /usersummary-service/v2/dailysummaries as returned by the real API
+        return {"data": [{"uuid": "x", "calendarDate": d.isoformat(), "heartRate": {"restingValue": 48},
+                          "movement": {"steps": {"value": 9000, "goal": 8000}},
+                          "stress": {"avgLevel": 25}, "bodyBattery": {"minValue": 20, "maxValue": 80}}
+                         for d in days]}
 
     def get_daily_hrv_summaries(self, lo, hi):
         return {"hrvSummaries": [{"calendarDate": lo.isoformat(), "lastNightAvg": 62, "weeklyAvg": 60}]}
@@ -95,6 +98,7 @@ def test_daily_merges_endpoints_and_falls_back_for_sleep():
     rows = {r["date"]: r for r in source().fetch_daily(days)}
     first = rows["2026-10-01"]
     assert first["resting_hr"] == 48 and first["steps"] == 9000 and first["body_battery_high"] == 80
+    assert first["body_battery_low"] == 20 and first["stress_avg"] == 25
     assert first["hrv"] == 62
     assert first["sleep_s"] == 27000 and first["sleep_score"] == 81
     assert rows["2026-10-03"].get("hrv") is None

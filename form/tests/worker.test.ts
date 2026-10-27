@@ -152,6 +152,19 @@ describe("user data", () => {
     expect(data.activities).toHaveLength(0);
   });
 
+  it("stores StrengthLog sets idempotently with session info and refuses oversized batches", async () => {
+    const cookie = await login();
+    const set = { id: "sl-1793096561550-knaboj1x-1", date: "2026-10-27", sessionId: "sl-1793096561550", exercise: "Knäböj", setIndex: 1, weightKg: 55, reps: 5,
+      sessionName: "Helkropp: A", sessionStart: "2026-10-27T11:22", sessionDurationS: 1830 };
+    await req("/api/strength", authed(cookie, json("POST", { sets: [set] })));
+    await req("/api/strength", authed(cookie, json("POST", { sets: [set] })));
+    const data = await (await req("/api/data", authed(cookie))).json();
+    expect(data.strength).toHaveLength(1);
+    expect(data.strength[0]).toMatchObject({ source: "strengthlog", sessionStart: "2026-10-27T11:22", sessionDurationS: 1830 });
+    const big = Array.from({ length: 1001 }, (_, i) => ({ ...set, id: `x-${i}` }));
+    expect((await req("/api/strength", authed(cookie, json("POST", { sets: big })))).status).toBe(400);
+  });
+
   it("explains that one-tap sync needs configuration", async () => {
     const cookie = await login();
     const res = await req("/api/sync", authed(cookie, { method: "POST" }));

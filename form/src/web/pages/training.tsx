@@ -127,6 +127,7 @@ function ActivityDetail({ id }: { id: string }) {
       <Card>
         <div class="row" style="gap:22px">{facts.map(([l, v]) => <div class="fact"><div class="v">{v}</div><div class="l">{l}</div></div>)}</div>
       </Card>
+      {a.sport === "strength" && <StrengthSessionCard a={a} />}
       {z && <Card title="Tid i pulszoner" sub={describeZones(zones)}>
         <BarChart data={z.map((sec, i) => ({ label: `Zon ${i + 1}`, values: { m: sec / 60 } }))} series={[{ id: "m", label: "Minuter", color: "var(--s-strength)" }]} height={150} yFormat={(v) => `${Math.round(v)}`} />
       </Card>}
@@ -144,16 +145,33 @@ function ActivityDetail({ id }: { id: string }) {
         </Card>}
       </>}
       {streams === null && a.source === "garmin" && <Notice kind="info">Tidsserier för passet har inte hämtats än. De laddas ner från Garmin vid nästa synk.</Notice>}
-      <Card title="Din upplevelse" sub="Valfritt – hjälper coachen att förstå hur passen känns.">
+      {a.source !== "strengthlog" && <Card title="Din upplevelse" sub="Valfritt – hjälper coachen att förstå hur passen känns.">
         <div class="stack">
           <div class="small">RPE (1 = mycket lätt, 10 = maximalt)</div>
           <div class="chips">{[3, 4, 5, 6, 7, 8, 9].map((n) => <button class="chip" aria-pressed={rpe === n} onClick={() => setRpe(rpe === n ? null : n)}>{n}</button>)}</div>
           <textarea class="input" placeholder="Anteckning, t.ex. hur knät kändes" value={note} onInput={(e) => setNote(e.currentTarget.value)} />
           <button class="btn" disabled={busy} onClick={() => run(() => store.patchActivity(a.id, { rpe, note: note || null }))}>{busy ? "Sparar…" : "Spara"}</button>
         </div>
-      </Card>
-      <p class="muted small">{similar >= 5 ? `${similar} jämförbara pass (${SPORT_LABEL[a.sport].toLowerCase()}, samma miljö) finns i Trender.` : "För få jämförbara pass för en rättvis jämförelse än."}</p>
+      </Card>}
+      {a.sport !== "strength" && <p class="muted small">{similar >= 5 ? `${similar} jämförbara pass (${SPORT_LABEL[a.sport].toLowerCase()}, samma miljö) finns i Trender.` : "För få jämförbara pass för en rättvis jämförelse än."}</p>}
     </div>
+  );
+}
+
+const yearDay = (d: string) => `${formatDay(d)} ${d.slice(0, 4)}`;
+
+function StrengthSessionCard({ a }: { a: Activity }) {
+  const b = useBundle();
+  const sets = b.strength.filter((s) => (a.source === "strengthlog" ? s.sessionId === a.id : s.date === a.date));
+  if (!sets.length) return a.source === "garmin" ? <p class="muted small">Inga set från StrengthLog den här dagen.</p> : null;
+  const byEx = new Map<string, typeof sets>();
+  for (const s of sets) byEx.set(s.exercise, [...(byEx.get(s.exercise) ?? []), s]);
+  return (
+    <Card title="Övningar" sub={`Från StrengthLog · ${sets.length} set`}>
+      <div class="list">{[...byEx.entries()].map(([ex, ss]) => (
+        <div class="item"><div class="main"><div class="t">{ex}</div>
+          <div class="s" style="white-space:normal">{ss.sort((x, y) => x.setIndex - y.setIndex).map((s) => `${s.reps ?? "–"} × ${s.weightKg != null ? `${fmt(s.weightKg, s.weightKg % 1 ? 1 : 0)} kg` : "kroppsvikt"}`).join(" · ")}</div></div></div>))}</div>
+    </Card>
   );
 }
 
@@ -300,14 +318,15 @@ function Strength() {
   const b = useBundle();
   const store = useStore();
   const weeks = weeklySummary(b.activities, b.zones, b.profile, b.today, 8);
-  const progress = exerciseProgress(b.strength);
+  // Last 12 weeks only: over longer periods, program changes look like regression.
+  const progress = exerciseProgress(b.strength.filter((x) => x.date >= addDays(b.today, -84)), 4);
   const coverage = muscleCoverage(b.strength, b.today);
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const { busy, error, run, setError } = useAsync();
   const [done, setDone] = useState<string | null>(null);
   return (
     <div class="stack">
-      <Card title="Styrkepass per vecka" sub="Från Garmin och manuellt inlagda pass">
+      <Card title="Styrkepass per vecka" sub="Från Garmin, StrengthLog och manuellt inlagda pass (räknas en gång per dag)">
         <BarChart data={weeks.map((w) => ({ label: `v${isoW(w.week)}`, values: { s: w.strength } }))} series={[{ id: "s", label: "Styrkepass", color: "var(--s-strength)" }]} height={140} />
       </Card>
       <Card title="StrengthLog" sub="Fortsätt logga i StrengthLog. Importera exporten här när du vill se progression och volym.">
@@ -322,9 +341,13 @@ function Strength() {
               setParsed(p);
             }} /></label>
           {parsed && parsed.sets.length > 0 && <div class="stack">
-            <p class="small">Hittade <b>{parsed.sets.length}</b> set från {new Set(parsed.sets.map((s) => s.sessionId)).size} pass{parsed.skipped ? `, ${parsed.skipped} rader hoppades över` : ""}.
-              Kolumner: {Object.entries(parsed.columns).filter(([, v]) => v).map(([k, v]) => `${k} = ”${v}”`).join(", ")}.</p>
-            <button class="btn primary" disabled={busy} onClick={() => run(async () => { const n = await store.importStrength(parsed.sets); setDone(`${n} set importerade.`); setParsed(null); })}>Importera</button>
+            <p class="small">Hittade <b>{parsed.sets.length}</b> set från <b>{parsed.sessions}</b> pass ({yearDay(parsed.sets.reduce((m, x) => (x.date < m ? x.date : m), parsed.sets[0].date))} – {yearDay(parsed.sets.reduce((m, x) => (x.date > m ? x.date : m), parsed.sets[0].date))}).
+              {parsed.warmups ? ` ${parsed.warmups} uppvärmningsset räknas inte.` : ""}{parsed.skipped ? ` ${parsed.skipped} rader kunde inte läsas.` : ""}</p>
+            <p class="tiny muted">Samma pass importeras aldrig två gånger – du kan importera en ny export när du vill.</p>
+            <button class="btn primary" disabled={busy} onClick={() => run(async () => {
+              const n = await store.importStrength(parsed.sets, (d) => setDone(`Importerar… ${d} av ${parsed.sets.length} set`));
+              setDone(`${n} set från ${parsed.sessions} pass importerade.`); setParsed(null);
+            })}>{busy ? "Importerar…" : "Importera"}</button>
           </div>}
           {done && <p class="small" style="color:var(--good)">{done}</p>}
           {error && <p class="small" style="color:var(--attention)">{error}</p>}
@@ -336,7 +359,7 @@ function Strength() {
           <BarChart data={coverage.map((c) => ({ label: c.group.split(" ")[0], values: { s: c.sets } }))} series={[{ id: "s", label: "Set", color: "var(--s-strength)" }]} height={150} />}
       </Card>
       {progress.slice(0, 6).map((p) => (
-        <Card title={p.exercise} sub={`Uppskattat 1RM (Epley) · ${p.sessions.length} pass${p.changePct != null ? ` · ${p.changePct >= 0 ? "+" : ""}${fmt(p.changePct, 1)} %` : ""}`}>
+        <Card title={p.exercise} sub={`Uppskattat 1RM (Epley), senaste 12 veckorna · ${p.sessions.length} pass${p.changePct != null ? ` · ${p.changePct >= 0 ? "+" : ""}${fmt(p.changePct, 1)} %` : ""}`}>
           <LineChart data={p.sessions.map((s) => ({ x: s.date, values: { v: s.best } }))} series={[{ id: "v", label: "1RM", color: "var(--s-strength)", dots: true }]} xFormat={(x) => formatDay(x)} yFormat={(v) => `${Math.round(v)}`} height={150} />
         </Card>
       ))}

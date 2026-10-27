@@ -147,6 +147,10 @@ export interface StrengthSet {
   weightKg: number | null;
   reps: number | null;
   rpe: number | null;
+  /** Session info from the StrengthLog export, repeated on each set. */
+  sessionName?: string | null;
+  sessionStart?: string | null;      // local "YYYY-MM-DDTHH:MM"
+  sessionDurationS?: number | null;
 }
 
 export interface HrZones {

@@ -264,10 +264,16 @@ app.delete("/api/measurements/:id", async (c) => {
 app.post("/api/strength", async (c) => {
   const b = await c.req.json<{ sets?: any[]; source?: string }>();
   const source = b.source === "manual" ? "manual" : "strengthlog";
-  const sets: StrengthSet[] = (b.sets ?? []).slice(0, 5000).map((s, i) => ({
+  // The app uploads big exports in batches of 500; refuse anything larger instead of cutting it silently.
+  if ((b.sets ?? []).length > 1000) throw new BadRequest("För många set i en förfrågan (max 1000).");
+  const sets: StrengthSet[] = (b.sets ?? []).map((s, i) => ({
     id: s.id ? id(s.id) : `s-${crypto.randomUUID()}`, source, date: date(s.date), sessionId: id(s.sessionId ?? `${s.date}`),
     exercise: str(s.exercise, 80, false)!, setIndex: int(s.setIndex ?? i + 1, 1, 100, "set", false)!,
     weightKg: num(s.weightKg, 0, 500, "vikt"), reps: int(s.reps, 0, 200, "repetitioner"), rpe: num(s.rpe, 1, 10, "RPE"),
+    sessionName: str(s.sessionName, 120),
+    sessionStart: typeof s.sessionStart === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s.sessionStart) ? s.sessionStart : null,
+    // Metadata only: an implausible duration is dropped instead of failing the whole import.
+    sessionDurationS: Number.isFinite(s.sessionDurationS) && s.sessionDurationS > 0 && s.sessionDurationS <= 6 * 3600 ? Math.round(s.sessionDurationS) : null,
   }));
   for (let i = 0; i < sets.length; i += 100) {
     await c.env.DB.batch(sets.slice(i, i + 100).map((s) => c.env.DB.prepare(

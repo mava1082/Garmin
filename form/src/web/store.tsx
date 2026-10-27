@@ -2,6 +2,7 @@ import { createContext, type ComponentChildren } from "preact";
 import { useCallback, useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { todayStockholm } from "../core/dates";
 import { demoBundle, demoStreams } from "../core/demo";
+import { strengthActivities } from "../core/strength";
 import type { Activity, ActivityStreams, CheckIn, DataBundle, HrZones, Measurement, PlanItem, Profile, StrengthSet, WeightEntry } from "../core/types";
 
 export type Bundle = DataBundle & { syncButton?: boolean };
@@ -34,7 +35,7 @@ interface Store {
   deleteWeight(id: string): Promise<void>;
   addMeasurement(date: string, cm: number): Promise<void>;
   deleteMeasurement(id: string): Promise<void>;
-  importStrength(sets: Omit<StrengthSet, "id" | "source">[]): Promise<number>;
+  importStrength(sets: Omit<StrengthSet, "source">[], onProgress?: (done: number) => void): Promise<number>;
   patchActivity(id: string, patch: { rpe: number | null; note: string | null }): Promise<void>;
   addActivity(a: { date: string; sport: Activity["sport"]; minutes: number; name: string; rpe: number | null }): Promise<void>;
   saveZones(z: { sport: string; floors?: number[]; maxHr?: number | null; remove?: boolean }): Promise<void>;
@@ -55,6 +56,12 @@ export function useBundle(): Bundle {
   return useStore().bundle!;
 }
 
+/** StrengthLog sessions count as training too (derived on the fly, never stored as activities). */
+function withStrengthSessions(b: Bundle): Bundle {
+  const own = b.activities.filter((a) => a.source !== "strengthlog");
+  return { ...b, activities: [...own, ...strengthActivities(b.strength, own)].sort((x, y) => x.startLocal.localeCompare(y.startLocal)) };
+}
+
 const uid = () => `l-${Math.random().toString(36).slice(2, 10)}`;
 
 export function StoreProvider({ children }: { children: ComponentChildren }) {
@@ -67,7 +74,7 @@ export function StoreProvider({ children }: { children: ComponentChildren }) {
   const load = useCallback(async () => {
     try {
       const b = await api<Bundle>("/api/data");
-      setBundle({ ...b, today: todayStockholm() });
+      setBundle(withStrengthSessions({ ...b, today: todayStockholm() }));
       setStatus("ready");
       setError(null);
     } catch (e) {
@@ -85,7 +92,7 @@ export function StoreProvider({ children }: { children: ComponentChildren }) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [status, demo, load]);
 
-  const local = (fn: (b: Bundle) => Bundle) => setBundle((b) => (b ? fn(b) : b));
+  const local = (fn: (b: Bundle) => Bundle) => setBundle((b) => (b ? withStrengthSessions(fn(b)) : b));
 
   const store: Store = useMemo(() => ({
     status, bundle, error, refreshing,
@@ -137,9 +144,18 @@ export function StoreProvider({ children }: { children: ComponentChildren }) {
       if (!demo) await api(`/api/measurements/${id}`, { method: "DELETE" });
       local((b) => ({ ...b, measurements: b.measurements.filter((m) => m.id !== id) }));
     },
-    async importStrength(sets) {
-      if (!demo) { const r = await api<{ count: number }>("/api/strength", { method: "POST", body: JSON.stringify({ sets, source: "strengthlog" }) }); await load(); return r.count; }
-      local((b) => ({ ...b, strength: [...b.strength, ...sets.map((s) => ({ ...s, id: uid(), source: "demo" as const }))] }));
+    async importStrength(sets, onProgress) {
+      if (!demo) {
+        let n = 0;
+        for (let i = 0; i < sets.length; i += 500) {
+          const r = await api<{ count: number }>("/api/strength", { method: "POST", body: JSON.stringify({ sets: sets.slice(i, i + 500), source: "strengthlog" }) });
+          n += r.count;
+          onProgress?.(n);
+        }
+        await load();
+        return n;
+      }
+      local((b) => ({ ...b, strength: [...b.strength.filter((x) => !sets.some((s) => s.id === x.id)), ...sets.map((s) => ({ ...s, source: "demo" as const }))] }));
       return sets.length;
     },
     async patchActivity(id, patch) {

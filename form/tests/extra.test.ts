@@ -68,3 +68,37 @@ describe("plan fallback", () => {
     expect(items).toHaveLength(1);
   });
 });
+
+describe("StrengthLog export format", () => {
+  // Same layout as a real StrengthLog export (values made up).
+  const csv = [
+    "workout,start,end,exercise,specialset,weight,bodyweight,extraWeight,reps,rir,warmup,max,fail,checked,setComment,workoutComment,form,sleep,calories,stress",
+    '"Helkropp: A",1793096561550,1793098391320,Knäböj,,40,,,8,,true,false,false,1793096600000,,,,,,',
+    '"Helkropp: A",1793096561550,1793098391320,Knäböj,,55,,,5,,false,false,false,1793096694846,,,,,,',
+    '"Helkropp: A",1793096561550,1793098391320,Knäböj,,55,,,5,,false,false,false,1793096791853,,,,,,',
+    '"Helkropp: A",1793096561550,1793098391320,Axelpress i maskin,,"27,5",,,12,2,false,false,false,1793097414416,,,,,,',
+    '"Helkropp: A",1793096561550,1793098391320,Chins,,,"91,9",5,6,,false,false,false,1793097559952,,,,,,',
+  ].join("\n");
+
+  it("reads epoch timestamps, decimal commas, bodyweight exercises and skips warm-ups", () => {
+    const p = parseStrengthCsv(csv);
+    expect(p.warmups).toBe(1);
+    expect(p.sessions).toBe(1);
+    expect(p.sets).toHaveLength(4);
+    expect(p.sets[0]).toMatchObject({ date: "2026-10-27", sessionStart: "2026-10-27T11:22", sessionDurationS: 1830, sessionName: "Helkropp: A", weightKg: 55, setIndex: 1 });
+    expect(p.sets[2]).toMatchObject({ exercise: "Axelpress i maskin", weightKg: 27.5, rpe: 8 });
+    expect(p.sets[3]).toMatchObject({ exercise: "Chins", weightKg: 96.9 });
+    expect(new Set(p.sets.map((s) => s.id)).size).toBe(4);
+    expect(parseStrengthCsv(csv).sets.map((s) => s.id)).toEqual(p.sets.map((s) => s.id)); // stable ids: re-import never duplicates
+  });
+
+  it("counts StrengthLog sessions as training unless the watch recorded one", async () => {
+    const { strengthActivities } = await import("../src/core/strength");
+    const sets = parseStrengthCsv(csv).sets.map((s) => ({ ...s, source: "strengthlog" as const }));
+    const derived = strengthActivities(sets, []);
+    expect(derived).toHaveLength(1);
+    expect(derived[0]).toMatchObject({ sport: "strength", source: "strengthlog", durationS: 1830, name: "Helkropp: A" });
+    const watch = { ...derived[0], id: "g1", source: "garmin" as const };
+    expect(strengthActivities(sets, [watch])).toHaveLength(0);
+  });
+});

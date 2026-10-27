@@ -45,9 +45,9 @@ def main() -> None:
         except Exception as e:
             print(f"FEL: {e}")
     print("\n== Tolkat av dashboarden för", day)
-    parsed = src.fetch_daily([day])[0]
+    parsed = (src.fetch_daily([day]) or [{"date": day}])[0]
     print({k: ("✓" if v is not None else "saknas") for k, v in parsed.items() if k != "date"})
-    print("Profil:", src.profile())
+    print("Profil:", {k: "✓" for k in src.profile()} or "saknas")
 
 
 if __name__ == "__main__":

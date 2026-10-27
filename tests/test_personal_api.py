@@ -31,7 +31,7 @@ class FakeClient:
         raise RuntimeError("HTTP 404")  # force the per-day fallback
 
     def get_daily_sleep(self, d):
-        return {"dailySleepDTO": {"calendarDate": d.isoformat(), "sleepTimeSeconds": 27000,
+        return {"dailySleepDTO": {"calendarDate": str(d), "sleepTimeSeconds": 27000,
                                   "sleepScores": {"overall": {"value": 81}}}}
 
     def get_heart_rate_zones(self):
@@ -39,8 +39,9 @@ class FakeClient:
                 {"sport": "DEFAULT", "maxHeartRateUsed": 192, "restingHeartRateUsed": 46}]
 
 
-def source(client=None):
-    return PersonalApiSource(SimpleNamespace(personal_api_key="x"), client=client or FakeClient())
+def source(client=None, sleeps=None):
+    record = sleeps.append if sleeps is not None else (lambda s: None)
+    return PersonalApiSource(SimpleNamespace(personal_api_key="x"), client=client or FakeClient(), sleep=record)
 
 
 def test_activities_are_paged_and_mapped():
@@ -50,6 +51,43 @@ def test_activities_are_paged_and_mapped():
     assert [c[1] for c in client.calls] == [0, 100]
     a = acts[0]
     assert a["sport"] == "running" and a["start_time"] == "2026-10-20T07:00:00" and a["hr_z2"] == 3000.0
+
+
+class RateLimited(Exception):
+    status_code = 429
+    response_text = '{"count":101,"limit":100,"retryInSeconds":12}'
+
+
+def test_rate_limit_waits_and_retries():
+    calls = {"n": 0}
+
+    def limited():
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise RateLimited()
+        return "ok"
+
+    sleeps = []
+    assert source(sleeps=sleeps)._call(limited) == "ok"
+    assert 13.0 in sleeps and sleeps.count(13.0) == 2
+
+
+def test_requests_are_spaced_out():
+    sleeps = []
+    src = source(sleeps=sleeps)
+    src._clock = lambda: 100.0  # no time passes between calls
+    src._call(lambda: 1)
+    src._call(lambda: 2)
+    assert sleeps == [0.7]
+
+
+def test_failed_days_are_left_out_for_retry():
+    class Flaky(FakeClient):
+        def get_daily_hrv_summaries(self, lo, hi):
+            raise RuntimeError("HTTP 500")
+
+    days = [date(2026, 10, 1) + timedelta(days=i) for i in range(3)]
+    assert source(Flaky()).fetch_daily(days) == []
 
 
 def test_daily_merges_endpoints_and_falls_back_for_sleep():

@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: "17 */3 * * *"   # var tredje timme
   workflow_dispatch:          # knappen "Run workflow"
+    inputs:
+      debug:
+        description: "Visa hur Garmins svar ser ut (för felsökning)"
+        type: boolean
+        default: false
   push:
     paths:
       - "settings.json"
@@ -52,8 +57,12 @@ jobs:
           path: |
             data
             ~/.config/garmin
-          key: garmin-db-${{ github.run_id }}
-          restore-keys: garmin-db-
+          key: garmin-db-v2-${{ github.run_id }}
+          restore-keys: garmin-db-v2-
+
+      - name: Felsökning (struktur på Garmins svar, inga värden)
+        if: ${{ inputs.debug }}
+        run: python -m garmin_dashboard.probe
 
       - name: Hämta data och bygg
         run: python -m garmin_dashboard.build_static --out site

@@ -27,20 +27,18 @@ _load_dotenv(ROOT / ".env")
 
 @dataclass(frozen=True)
 class Config:
-    # demo | garminconnect | health_api
-    source: str = os.environ.get("GARMIN_SOURCE", "demo")
+    # demo | personal_api | garminconnect. Defaults to personal_api when a key is set.
+    source: str = os.environ.get("GARMIN_SOURCE") or (
+        "personal_api" if os.environ.get("GARMIN_PERSONAL_API_KEY") else "demo")
     db_path: Path = Path(os.environ.get("DB_PATH", ROOT / "data" / "garmin.db"))
+
+    # Official Garmin Connect Personal API (self-service key from Garmin Connect)
+    personal_api_key: str | None = os.environ.get("GARMIN_PERSONAL_API_KEY") or None
 
     # garminconnect (Garmin Connect username/password, unofficial API)
     email: str | None = os.environ.get("GARMIN_EMAIL")
     password: str | None = os.environ.get("GARMIN_PASSWORD")
     tokenstore: Path = Path(os.environ.get("GARMIN_TOKENSTORE", Path.home() / ".garminconnect"))
-
-    # Official Garmin Connect Developer Program (Health/Activity API, OAuth 1.0a)
-    consumer_key: str | None = os.environ.get("GARMIN_CONSUMER_KEY")
-    consumer_secret: str | None = os.environ.get("GARMIN_CONSUMER_SECRET")
-    access_token: str | None = os.environ.get("GARMIN_ACCESS_TOKEN")
-    access_token_secret: str | None = os.environ.get("GARMIN_ACCESS_TOKEN_SECRET")
 
     host: str = os.environ.get("HOST", "127.0.0.1")
     port: int = int(os.environ.get("PORT", "8000"))

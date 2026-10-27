@@ -39,7 +39,7 @@ def get_source(cfg) -> Source:
     if cfg.source == "garminconnect":
         from .garminconnect_source import GarminConnectSource
         return GarminConnectSource(cfg)
-    if cfg.source == "health_api":
-        from .health_api import HealthApiSource
-        return HealthApiSource(cfg)
-    raise ValueError(f"Okänd GARMIN_SOURCE: {cfg.source!r} (demo | garminconnect | health_api)")
+    if cfg.source == "personal_api":
+        from .personal_api import PersonalApiSource
+        return PersonalApiSource(cfg)
+    raise ValueError(f"Okänd GARMIN_SOURCE: {cfg.source!r} (demo | personal_api | garminconnect)")

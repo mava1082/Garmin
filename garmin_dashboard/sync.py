@@ -43,7 +43,10 @@ def sync(db: Database, days: int = 180, full: bool = False, today: date | None =
     todo = [d for d in window if d.isoformat() not in have or d in recent]
     n_daily = db.upsert_daily(source.fetch_daily(todo))
 
-    db.save_settings({"last_sync": datetime.now().isoformat(timespec="seconds"), "source": config.source})
+    updates: dict = {"last_sync": datetime.now().isoformat(timespec="seconds"), "source": config.source}
+    if settings.get("hr_auto", True) and hasattr(source, "profile"):
+        updates.update(source.profile())
+    db.save_settings(updates)
     return {"source": source.name, "activities": n_act, "days": n_daily}
 
 

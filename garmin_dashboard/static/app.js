@@ -42,7 +42,7 @@ function showError(msg) {
 function render() {
   const d = state.data;
   const s = d.settings;
-  const src = { demo: "demodata", garminconnect: "Garmin Connect", health_api: "Garmin Health API" }[d.source] || d.source;
+  const src = { demo: "demodata", personal_api: "Garmin Personal API", garminconnect: "Garmin Connect" }[d.source] || d.source;
   $("#meta").textContent = `${src} · ${d.counts.activities} pass · senast synkad ${s.last_sync ? s.last_sync.replace("T", " ").slice(0, 16) : "aldrig"}`;
   renderReadiness(d.readiness);
   renderTiles(d);

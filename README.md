@@ -31,12 +31,41 @@ Utan inställningar körs **demoläget** med ett års syntetisk träning, så du
 
 ## Koppla din Garmin-data
 
-Ordet "API-nyckel" kan betyda två olika saker hos Garmin, och dashboarden stöder båda:
+### Garmin Personal API (rekommenderat)
 
-### A) Ditt vanliga Garmin Connect-konto (enklast)
+Garmins officiella, kostnadsfria API för din egen data. Det släpptes i oktober 2026.
 
-Använder biblioteket [`garminconnect`](https://github.com/cyberjunky/python-garminconnect), som loggar in
-som Garmin Connect-appen. Det ger mest data: pulszoner per pass, HRV, Body Battery och VO₂max.
+1. Logga in på Garmin Connect på webben och skapa en **Personal API Key** under Garmins
+   utvecklarsidor. Välj giltighetstid (30 dagar–1 år). Nyckeln visas bara en gång, så spara den.
+2. Lägg den i `.env`:
+   ```ini
+   GARMIN_PERSONAL_API_KEY=din-nyckel
+   ```
+   När nyckeln finns används Personal API automatiskt (`GARMIN_SOURCE=personal_api`).
+3. Hämta historik och starta:
+   ```bash
+   python -m garmin_dashboard.sync --days 365
+   python -m garmin_dashboard
+   ```
+
+Dashboarden använder Garmins officiella Python-klient
+([`garmin-connect-personal-api-python`](https://github.com/garmin/connect-personal-api-python)).
+Den byter nyckeln mot en åtkomsttoken som gäller i 24 timmar och sparas i `~/.config/garmin/`.
+Därefter hämtas aktiviteter med pulszoner, dagliga sammanfattningar (vilopuls, steg, stress,
+Body Battery), HRV och sömn. Maxpuls och vilopuls hämtas från dina pulszoner i Garmin tills du
+ändrar dem själv under ⚙︎.
+
+VO₂max ingår inte i Personal API, så den rutan visas inte.
+
+**Om något ser tomt ut**: kör `python -m garmin_dashboard.probe`. Det visar strukturen på varje
+svar (nycklar och typer, inte dina värden) och vad dashboarden lyckades tolka. Det är säkert att dela.
+
+När nyckeln går ut skapar du en ny i Garmin Connect och byter värdet i `.env`.
+
+### Alternativ: garminconnect (inofficiellt)
+
+Biblioteket [`garminconnect`](https://github.com/cyberjunky/python-garminconnect) loggar in med
+e-post och lösenord som Garmin Connect-appen. Det ger även VO₂max.
 
 ```ini
 GARMIN_SOURCE=garminconnect
@@ -44,34 +73,8 @@ GARMIN_EMAIL=du@example.com
 GARMIN_PASSWORD=...
 ```
 
-Kör första synken i terminalen så att du kan skriva in en MFA-kod om du har tvåstegsverifiering:
-
-```bash
-python -m garmin_dashboard.sync --days 365
-```
-
-Därefter sparas tokens i `~/.garminconnect`, och du kan ta bort lösenordet ur `.env` och synka med knappen i dashboarden.
-
-### B) Garmin Connect Developer Program (consumer key + secret)
-
-Om du har ett godkänt utvecklarkonto har du fått en *consumer key* och en *consumer secret*:
-
-```ini
-GARMIN_SOURCE=health_api
-GARMIN_CONSUMER_KEY=...
-GARMIN_CONSUMER_SECRET=...
-```
-
-Godkänn sedan appen för ditt eget konto en gång. Kommandot skriver ut access-token som du klistrar in i `.env`:
-
-```bash
-python -m garmin_dashboard.health_auth
-```
-
-Data hämtas från Health API:s pull-endpoints (`dailies`, `sleeps`, `hrv`, `activities`). Den här
-vägen är otestad mot riktiga nycklar. Garmins pull-endpoints har en begränsad lagringstid, och vissa
-appar är konfigurerade enbart för push, så kontrollera inställningarna i utvecklarportalen. Health
-API skickar inte zontider per pass, så zonerna uppskattas från snittpuls.
+Kör första synken i terminalen (`python -m garmin_dashboard.sync --days 365`) så att du kan skriva
+in en MFA-kod. Tokens sparas sedan i `~/.garminconnect`.
 
 ## Inställningar
 
@@ -84,6 +87,7 @@ timmar. Korrekt maxpuls är viktigast: den styr både belastningen och zonuppska
 python -m garmin_dashboard                       # starta webbservern
 python -m garmin_dashboard.sync --days 180       # synka (inkrementellt)
 python -m garmin_dashboard.sync --days 365 --full  # hämta om allt
+python -m garmin_dashboard.probe                 # felsök Personal API-svar
 python -m pytest                                 # tester
 ```
 
@@ -94,7 +98,7 @@ garmin_dashboard/
   analytics.py      belastning, CTL/ATL/TSB, beredskap, insikter, rekord
   sync.py           hämtar från vald källa till SQLite (data/garmin.db)
   server.py         FastAPI: /api/dashboard, /api/sync, /api/settings
-  sources/          demo, garminconnect, health_api
+  sources/          demo, personal_api, garminconnect
   static/           dashboarden (HTML/CSS/JS + Chart.js lokalt)
 ```
 

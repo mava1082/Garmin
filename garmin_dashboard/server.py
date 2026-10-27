@@ -77,7 +77,11 @@ def get_settings() -> dict:
 
 @app.put("/api/settings")
 def put_settings(body: SettingsIn) -> dict:
-    return db.save_settings(body.model_dump())
+    values = body.model_dump()
+    current = db.settings()
+    if (values["max_hr"], values["resting_hr"]) != (current["max_hr"], current["resting_hr"]):
+        values["hr_auto"] = False  # the user's own numbers win over Garmin's from now on
+    return db.save_settings(values)
 
 
 @app.get("/")

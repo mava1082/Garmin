@@ -63,6 +63,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "resting_hr": 50,
     "sex": "male",              # affects Banister TRIMP weighting
     "weekly_goal_hours": 6.0,
+    "hr_auto": True,            # take max/resting HR from Garmin until the user edits them
     "last_sync": None,
     "source": None,
 }

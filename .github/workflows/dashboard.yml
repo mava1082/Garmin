@@ -1,0 +1,74 @@
+# Hämtar Garmin-data, bygger den krypterade dashboarden och publicerar den på GitHub Pages.
+name: Uppdatera dashboard
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # var tredje timme
+  workflow_dispatch:          # knappen "Run workflow"
+  push:
+    paths:
+      - "settings.json"
+      - "garmin_dashboard/**"
+      - ".github/workflows/dashboard.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/Stockholm
+      GARMIN_PERSONAL_API_KEY: ${{ secrets.GARMIN_PERSONAL_API_KEY }}
+      DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kontrollera lösenord
+        run: |
+          if [ -z "$DASHBOARD_PASSWORD" ]; then
+            echo "::error::Lägg till hemligheten DASHBOARD_PASSWORD under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installera
+        run: pip install -r requirements.txt
+
+      # Databasen sparas mellan körningar så att bara nya dagar behöver hämtas.
+      - name: Återställ databas
+        uses: actions/cache@v4
+        with:
+          path: |
+            data
+            ~/.config/garmin
+          key: garmin-db-${{ github.run_id }}
+          restore-keys: garmin-db-
+
+      - name: Hämta data och bygg
+        run: python -m garmin_dashboard.build_static --out site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

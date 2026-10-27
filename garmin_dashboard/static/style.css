@@ -188,3 +188,31 @@ dialog form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 dialog label { display: grid; gap: 4px; font-size: .85rem; color: var(--text-2); }
 dialog input, dialog select { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+/* static (GitHub Pages) mode */
+[hidden] { display: none !important; }
+body:not(.static) .static-only, body.static .local-only { display: none !important; }
+.lock { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.lock form { width: min(360px, 100%); display: grid; gap: 12px; text-align: left; }
+.lock img { border-radius: 12px; }
+.lock label { display: grid; gap: 4px; font-size: .85rem; color: var(--text-2); }
+.lock label.check { display: flex; align-items: center; gap: 8px; }
+.lock input[type="password"] { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); font-size: 1rem; }
+.lock button { padding: 10px; font-size: 1rem; }
+#lockStatus:empty { display: none; }
+
+/* phones: compact header, comfortable tap targets */
+@media (max-width: 600px) {
+  .topbar { padding-top: max(14px, env(safe-area-inset-top)); }
+  .actions { width: 100%; }
+  #syncBtn { flex: 1; }
+  .segmented { flex: 1 1 100%; order: 2; }
+  .segmented button { flex: 1; padding: 9px 0; white-space: nowrap; }
+  .hero { gap: 16px; }
+  .score-ring { width: 104px; height: 104px; }
+  .score-num span { font-size: 2rem; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile .value { font-size: 1.4rem; }
+  .card { padding: 14px; }
+  .chart.tall { height: 230px; }
+}

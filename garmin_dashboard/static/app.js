@@ -5,7 +5,10 @@ const SPORT_SLOT = { running: 1, cycling: 2, swimming: 3, strength: 4, walking: 
 const STATUS_ICON = { good: "✓", info: "i", warning: "!", critical: "!!" };
 const LEVEL_STATUS = { high: "good", moderate: "good", low: "warning", rest: "critical", unknown: null };
 
-const state = { days: 90, data: null, charts: {} };
+const state = { days: 90, data: null, bundle: null, charts: {} };
+// Set by build_static.py when the dashboard is published as an encrypted static site.
+const STATIC = window.DASHBOARD_STATIC || null;
+const PASSWORD_KEY = "dashboard-password";
 
 const $ = (sel) => document.querySelector(sel);
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -23,6 +26,12 @@ async function api(path, opts) {
 }
 
 async function load() {
+  if (STATIC) {
+    if (!state.bundle) return showLock();
+    state.data = state.bundle.periods[String(state.days)];
+    render();
+    return;
+  }
   try {
     state.data = await api(`/api/dashboard?days=${state.days}`);
     showError(null);
@@ -31,6 +40,58 @@ async function load() {
     showError(`Kunde inte ladda data: ${e.message}`);
   }
 }
+
+// --- static mode: decrypt data.enc.json with the password -------------------
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function decryptBundle(password) {
+  const res = await fetch(`./data.enc.json?t=${Date.now()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Hittade ingen data än. Har GitHub-flödet körts klart?");
+  const enc = await res.json();
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: b64(enc.salt), iterations: enc.iter },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  let plain;
+  try {
+    plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.data));
+  } catch {
+    throw new Error("Fel lösenord.");
+  }
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function showLock(message = "") {
+  $("#app").hidden = true;
+  $("#lock").hidden = false;
+  $("#lockStatus").textContent = message;
+  $("#lockSubmit").disabled = false;
+  $("#lockForm").password.focus();
+}
+
+async function unlock(password, remember) {
+  state.bundle = await decryptBundle(password);
+  try {
+    if (remember) localStorage.setItem(PASSWORD_KEY, password);
+    else localStorage.removeItem(PASSWORD_KEY);
+  } catch {}
+  $("#lock").hidden = true;
+  $("#app").hidden = false;
+  load();
+}
+
+$("#lockForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  $("#lockSubmit").disabled = true;
+  $("#lockStatus").textContent = "Låser upp…";
+  try {
+    await unlock(f.password.value, f.remember.checked);
+    f.reset();
+  } catch (err) {
+    showLock(err.message);
+  }
+});
 
 function showError(msg) {
   const el = $("#error");
@@ -43,8 +104,13 @@ function render() {
   const d = state.data;
   const s = d.settings;
   const src = { demo: "demodata", personal_api: "Garmin Personal API", garminconnect: "Garmin Connect" }[d.source] || d.source;
-  $("#meta").textContent = `${src} · ${d.counts.activities} pass · senast synkad ${s.last_sync ? s.last_sync.replace("T", " ").slice(0, 16) : "aldrig"}`;
+  $("#meta").textContent = `${src} · ${d.counts.activities} pass · ${STATIC ? "uppdaterad" : "senast synkad"} ${s.last_sync ? s.last_sync.replace("T", " ").slice(0, 16) : "aldrig"}`;
   $("#demoBanner").hidden = d.source !== "demo";
+  if (STATIC && d.source === "demo") {
+    $("#demoBanner span").innerHTML = "Du tittar på <b>påhittad demodata</b>. Lägg in din Garmin-nyckel som hemlighet " +
+      "<code>GARMIN_PERSONAL_API_KEY</code> i GitHub så visas din egen träning efter nästa uppdatering.";
+    $("#connectBtn").hidden = true;
+  }
   renderReadiness(d.readiness);
   renderTiles(d);
   renderInsights(d.insights);
@@ -271,6 +337,11 @@ $("#period").addEventListener("click", (e) => {
 });
 
 $("#syncBtn").addEventListener("click", async () => {
+  if (STATIC) {
+    // Static site: data is rebuilt by GitHub Actions; this opens the "Run workflow" page.
+    window.open(`https://github.com/${STATIC.repo}/actions/workflows/dashboard.yml`, "_blank", "noopener");
+    return;
+  }
   const btn = $("#syncBtn");
   btn.disabled = true;
   btn.textContent = "Synkar…";
@@ -288,12 +359,27 @@ $("#syncBtn").addEventListener("click", async () => {
 const dialog = $("#settingsDialog");
 $("#settingsBtn").addEventListener("click", () => {
   const s = state.data?.settings || {};
+  if (STATIC) {
+    const hr = s.hr_auto && state.data.source !== "demo" ? " (från Garmin)" : "";
+    $("#staticSettings").innerHTML = [
+      `Veckomål: ${fmt(s.weekly_goal_hours, 1)} h`, `Maxpuls: ${s.max_hr}${hr}`, `Vilopuls: ${s.resting_hr}${hr}`,
+      `Kön: ${s.sex === "female" ? "kvinna" : "man"}`,
+    ].map((t) => `<li>${esc(t)}</li>`).join("");
+    $("#editSettingsLink").href = `https://github.com/${STATIC.repo}/edit/${STATIC.branch}/settings.json`;
+  }
   const f = $("#settingsForm");
   for (const k of ["max_hr", "resting_hr", "sex", "weekly_goal_hours"]) if (s[k] != null) f.elements[k].value = s[k];
   dialog.showModal();
 });
+$("#logoutLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  try { localStorage.removeItem(PASSWORD_KEY); } catch {}
+  state.bundle = null;
+  dialog.close();
+  showLock();
+});
 dialog.addEventListener("close", async () => {
-  if (dialog.returnValue !== "save") return;
+  if (dialog.returnValue !== "save" || STATIC) return;
   const f = $("#settingsForm");
   const body = { max_hr: +f.max_hr.value, resting_hr: +f.resting_hr.value, sex: f.sex.value, weekly_goal_hours: +f.weekly_goal_hours.value };
   try {
@@ -349,4 +435,13 @@ $("#themeBtn").addEventListener("click", () => {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => state.data && render());
 try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
 
-load();
+if (STATIC) {
+  document.body.classList.add("static");
+  $("#syncBtn").textContent = "Uppdatera";
+  let saved = null;
+  try { saved = localStorage.getItem(PASSWORD_KEY); } catch {}
+  if (saved) unlock(saved, true).catch(() => showLock());
+  else showLock();
+} else {
+  load();
+}

@@ -2,3 +2,4 @@ fastapi>=0.110
 uvicorn>=0.29
 garminconnect>=0.3.20
 garmin-connect-personal-api-python>=1.0
+cryptography>=42

@@ -18,22 +18,44 @@ träningsråd för dagen.
 | **Insikter** | Automatiska varningar och tips: för snabb ökning, hög akut belastning, för mycket tid i zon 3, sjunkande HRV, sömnbrist, veckomål. |
 | **Rekord och senaste pass** | Längsta pass, snabbaste snittempo, största veckan och en tabell över senaste passen. |
 
-## Kom igång (ingen kodning behövs)
+## Kom igång på mobilen (ingen kodning, ingen dator)
 
-1. **Installera Python** (gratis, en gång) från [python.org/downloads](https://www.python.org/downloads/).
-   *Windows:* kryssa i **"Add python.exe to PATH"** längst ner i första installationsrutan.
-2. **Ladda ner dashboarden** som en ZIP-fil från GitHub (gröna knappen **Code → Download ZIP**)
-   och packa upp den, till exempel i mappen Dokument.
-3. **Starta** genom att dubbelklicka på
-   - **`start.bat`** på Windows. Om Windows varnar, klicka *Mer information → Kör ändå*.
-   - **`start.command`** på Mac. Om Mac säger att filen inte kan öppnas: öppna *Systeminställningar → Integritet och säkerhet*, scrolla ner och klicka *Öppna ändå*. Dubbelklicka sedan på filen igen.
+Dashboarden körs helt hos GitHub. Var tredje timme hämtar GitHub din Garmin-data, bygger sidan
+och publicerar den på **https://mava1082.github.io/Garmin/**. Datan krypteras med ett lösenord som
+du väljer, så ingen annan kan läsa den, trots att sidan är publik. Allt nedan går att göra i
+mobilens webbläsare på github.com.
 
-   Första gången tar det ett par minuter. Sedan öppnas dashboarden i webbläsaren. Låt det svarta
-   fönstret vara öppet medan du använder den, och stäng det när du är klar.
-4. **Koppla Garmin**: klicka på den blå knappen **Koppla Garmin**, klistra in din Personal API Key
-   och tryck **Koppla**. Dashboarden hämtar ditt senaste år. Det kan ta några minuter.
+1. **Gör repot publikt** (krävs för gratis GitHub Pages):
+   *Settings → General* → längst ner under *Danger Zone* → **Change visibility → Make public**.
+   Bara koden blir synlig. Din nyckel och din data syns aldrig.
+2. **Lägg in två hemligheter**: *Settings → Secrets and variables → Actions* → **New repository secret**.
+   - Name: `GARMIN_PERSONAL_API_KEY`, Secret: din Personal API Key från Garmin
+   - Name: `DASHBOARD_PASSWORD`, Secret: ett lösenord du hittar på (minst 8 tecken). Det är det du skriver på mobilen.
+3. **Slå på GitHub Pages**: *Settings → Pages* → under *Build and deployment*, välj Source **GitHub Actions**.
+4. **Kör första gången**: fliken *Actions* → **Uppdatera dashboard** → **Run workflow** → **Run workflow**.
+   Det tar 2–5 minuter. Får du frågan om att aktivera workflows, godkänn.
+5. **Öppna** https://mava1082.github.io/Garmin/ på mobilen och skriv ditt lösenord.
+6. **Lägg den på hemskärmen** så att den beter sig som en app:
+   - *iPhone (Safari):* Dela-knappen → **Lägg till på hemskärmen**
+   - *Android (Chrome):* ⋮-menyn → **Lägg till på startskärmen**
 
-Nästa gång dubbelklickar du bara på startfilen och trycker **Synka** för att hämta nya pass.
+**Att veta**
+- Datan uppdateras automatiskt var tredje timme. Knappen **Uppdatera** i dashboarden öppnar
+  GitHub, där du trycker *Run workflow* för att hämta direkt.
+- **Inställningar** (veckomål, kön, egen maxpuls/vilopuls) ändrar du i filen `settings.json`
+  i repot: öppna filen, tryck på pennan, ändra och tryck *Commit changes*. `null` betyder att
+  värdet hämtas från dina pulszoner i Garmin.
+- **När Garmin-nyckeln går ut** byter du värdet på hemligheten `GARMIN_PERSONAL_API_KEY` (steg 2).
+- GitHub pausar schemalagda körningar om repot inte har någon aktivitet på 60 dagar. Du får ett
+  mejl om det. Tryck då *Enable workflow* under *Actions*.
+- Utan nyckel visas demodata, så du kan se hur sidan ser ut redan innan steg 2.
+
+## Köra på din egen dator (alternativ)
+
+1. Installera [Python](https://www.python.org/downloads/). *Windows:* kryssa i **"Add python.exe to PATH"**.
+2. Ladda ner repot som ZIP (**Code → Download ZIP**) och packa upp det.
+3. Dubbelklicka på **`start.bat`** (Windows) eller **`start.command`** (Mac). Dashboarden öppnas i webbläsaren.
+4. Klicka **Koppla Garmin** och klistra in din Personal API Key.
 
 ### För utvecklare
 
@@ -111,9 +133,10 @@ python -m pytest                                 # tester
 garmin_dashboard/
   analytics.py      belastning, CTL/ATL/TSB, beredskap, insikter, rekord
   sync.py           hämtar från vald källa till SQLite (data/garmin.db)
+  build_static.py   bygger den krypterade mobilsidan (körs av GitHub Actions)
   server.py         FastAPI: /api/dashboard, /api/sync, /api/settings
   sources/          demo, personal_api, garminconnect
   static/           dashboarden (HTML/CSS/JS + Chart.js lokalt)
 ```
 
-All data stannar lokalt i `data/garmin.db`. `.env` och `data/` ignoreras av git.
+`.env`, `data/` och `site/` ignoreras av git. I GitHub Actions sparas databasen i Actions-cachen, och den publicerade sidan innehåller bara krypterad data.

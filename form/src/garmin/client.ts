@@ -93,7 +93,8 @@ export class GarminClient {
   }
 
   async getBytes(path: string): Promise<Uint8Array> {
-    const res = await this.request(path, undefined, "application/zip, application/octet-stream");
+    // Same Accept header as Garmin's own client; a narrower one is answered with HTTP 406.
+    const res = await this.request(path, undefined, "application/zip, application/x-zip-compressed, application/octet-stream");
     return new Uint8Array(await res.arrayBuffer());
   }
 

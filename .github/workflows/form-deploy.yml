@@ -81,4 +81,9 @@ jobs:
         run: |
           echo "### FORM är driftsatt" >> "$GITHUB_STEP_SUMMARY"
           echo "Öppna ${{ steps.cf.outputs.url }} på mobilen." >> "$GITHUB_STEP_SUMMARY"
-          curl -fsS "${{ steps.cf.outputs.url }}/api/health"
+          # A new workers.dev address can take a few minutes to get its certificate.
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ steps.cf.outputs.url }}/api/health"; then exit 0; fi
+            sleep 15
+          done
+          echo "::warning::Appen svarar inte än – en ny adress kan ta upp till 15 minuter innan den fungerar."

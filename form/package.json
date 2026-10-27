@@ -1,0 +1,31 @@
+{
+  "name": "form",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "FORM – personlig träningsapp med Garmin Personal API",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
+    "test": "vitest run",
+    "worker:dev": "wrangler dev --local",
+    "sync": "tsx src/sync/run.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "fit-file-parser": "^6.2.3",
+    "hono": "^4.13.14",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261027.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.153.0"
+  }
+}

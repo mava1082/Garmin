@@ -1,0 +1,63 @@
+# Hämtar data från Garmin Personal API och skickar den till FORM.
+name: FORM – synka Garmin
+
+on:
+  schedule:
+    - cron: "23 */2 * * *"   # varannan timme
+  workflow_dispatch:
+    inputs:
+      probe:
+        description: "Visa bara strukturen på Garmins svar (inga värden)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: form-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: form
+    env:
+      TZ: Europe/Stockholm
+      GARMIN_PERSONAL_API_KEY: ${{ secrets.GARMIN_PERSONAL_API_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      FORM_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+    steps:
+      - name: Kontrollera hemligheter
+        id: check
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$GARMIN_PERSONAL_API_KEY" ]; then
+            echo "::notice::FORM är inte driftsatt än (CLOUDFLARE_API_TOKEN eller GARMIN_PERSONAL_API_KEY saknas)."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.skip != '1'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != '1'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: form/package-lock.json
+      - run: npm ci
+        if: steps.check.outputs.skip != '1'
+      - name: Garmin-struktur (felsökning)
+        if: steps.check.outputs.skip != '1' && inputs.probe
+        run: npx tsx src/sync/run.ts --probe
+      - name: Synka
+        if: steps.check.outputs.skip != '1' && !inputs.probe
+        run: |
+          node scripts/cloudflare.mjs url
+          export FORM_URL="$(node scripts/cloudflare.mjs url | tail -1)"
+          export FORM_INGEST_TOKEN="$(node scripts/cloudflare.mjs ingest)"
+          echo "::add-mask::$FORM_INGEST_TOKEN"
+          npx tsx src/sync/run.ts

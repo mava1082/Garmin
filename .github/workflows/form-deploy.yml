@@ -1,0 +1,84 @@
+# Testar och driftsätter FORM på Cloudflare (Worker + D1 + appen).
+name: FORM – driftsätt
+
+on:
+  push:
+    paths: ["form/**", ".github/workflows/form-deploy.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: form-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: form
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      FORM_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: form/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: Kontrollera hemligheter
+        id: check
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN saknas – appen testades och byggdes men driftsattes inte. Se form/README.md."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          elif [ ${#FORM_PASSWORD} -lt 8 ]; then
+            echo "::error::DASHBOARD_PASSWORD saknas eller är kortare än 8 tecken."
+            exit 1
+          fi
+
+      - name: Förbered Cloudflare (subdomän och databas)
+        id: cf
+        if: steps.check.outputs.skip != '1'
+        run: node scripts/cloudflare.mjs ensure
+
+      - name: Databasmigreringar
+        if: steps.check.outputs.skip != '1'
+        run: npx wrangler d1 migrations apply form-db --remote
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ steps.cf.outputs.account_id }}
+
+      - name: Driftsätt
+        if: steps.check.outputs.skip != '1'
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ steps.cf.outputs.account_id }}
+
+      - name: Sätt hemligheter i Workern
+        if: steps.check.outputs.skip != '1'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ steps.cf.outputs.account_id }}
+          GITHUB_DISPATCH_TOKEN: ${{ secrets.FORM_GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$FORM_PASSWORD" | npx wrangler secret put APP_PASSWORD
+          node scripts/cloudflare.mjs ingest | npx wrangler secret put INGEST_TOKEN
+          if [ -n "$GITHUB_DISPATCH_TOKEN" ]; then
+            printf '%s' "$GITHUB_DISPATCH_TOKEN" | npx wrangler secret put GITHUB_TOKEN
+            printf '%s' "${{ github.repository }}" | npx wrangler secret put GITHUB_REPO
+          fi
+
+      - name: Sammanfattning
+        if: steps.check.outputs.skip != '1'
+        run: |
+          echo "### FORM är driftsatt" >> "$GITHUB_STEP_SUMMARY"
+          echo "Öppna ${{ steps.cf.outputs.url }} på mobilen." >> "$GITHUB_STEP_SUMMARY"
+          curl -fsS "${{ steps.cf.outputs.url }}/api/health"

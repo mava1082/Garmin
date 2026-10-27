@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/core",
+    "src/garmin",
+    "src/sync",
+    "tests"
+  ],
+  "exclude": [
+    "tests/worker.test.ts",
+    "tests/d1shim.ts"
+  ]
+}

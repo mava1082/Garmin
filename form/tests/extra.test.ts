@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GarminClient } from "../src/garmin/client";
 import { assessRecovery } from "../src/core/recovery";
-import { parseStrengthCsv, exerciseProgress, e1rm } from "../src/core/strength";
+import { parseStrengthCsv, exerciseProgress, e1rm, muscleCoverage } from "../src/core/strength";
 import { effectivePlan } from "../src/core/plan";
 import { suggestToday } from "../src/core/coach";
 import { defaultProfile } from "../src/core/profile";
@@ -100,5 +100,18 @@ describe("StrengthLog export format", () => {
     expect(derived[0]).toMatchObject({ sport: "strength", source: "strengthlog", durationS: 1830, name: "Helkropp: A" });
     const watch = { ...derived[0], id: "g1", source: "garmin" as const };
     expect(strengthActivities(sets, [watch])).toHaveLength(0);
+  });
+});
+
+describe("muscle coverage", () => {
+  it("averages sets per week over the last 28 days", () => {
+    const set = (date: string, exercise: string) => ({ id: `${date}-${exercise}-${Math.random()}`, date, sessionId: date, exercise, setIndex: 1, weightKg: 50, reps: 5, source: "strengthlog" as const });
+    const sets = [
+      ...Array.from({ length: 8 }, () => set("2026-10-27", "Knäböj")),
+      set("2026-09-30", "Knäböj"), // day 28 back, counts
+      set("2026-09-29", "Knäböj"), // outside the window
+    ];
+    const legs = muscleCoverage(sets as any, "2026-10-27").find((c) => c.perWeek > 0)!;
+    expect(legs.perWeek).toBe(9 / 4);
   });
 });

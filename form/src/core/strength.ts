@@ -1,4 +1,4 @@
-import { addDays, stockholmParts, weekStart } from "./dates";
+import { addDays, stockholmParts } from "./dates";
 import type { Activity, StrengthSet } from "./types";
 
 /**
@@ -209,9 +209,9 @@ export function muscleGroup(exercise: string): string | null {
   return GROUPS.find(([, re]) => re.test(exercise))?.[0] ?? null;
 }
 
-/** Sets per muscle group over the last four weeks. */
-export function muscleCoverage(sets: StrengthSet[], today: string): { group: string; sets: number }[] {
-  const from = addDays(weekStart(today), -21);
+/** Average sets per muscle group and week over the last four weeks (28 days up to today). */
+export function muscleCoverage(sets: StrengthSet[], today: string): { group: string; perWeek: number }[] {
+  const from = addDays(today, -27);
   const recent = sets.filter((s) => s.date >= from && s.date <= today);
-  return GROUPS.map(([group]) => ({ group, sets: recent.filter((s) => muscleGroup(s.exercise) === group).length }));
+  return GROUPS.map(([group]) => ({ group, perWeek: recent.filter((s) => muscleGroup(s.exercise) === group).length / 4 }));
 }

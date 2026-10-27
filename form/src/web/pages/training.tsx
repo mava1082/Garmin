@@ -354,9 +354,9 @@ function Strength() {
           <p class="tiny muted">I StrengthLog: Inställningar → Exportera data. Filen läses i telefonen och bara seten sparas. Formatet är inte officiellt dokumenterat – säg till om importen missar något.</p>
         </div>
       </Card>
-      <Card title="Muskelgrupper senaste 4 veckorna" sub="Antal set, tolkat från övningsnamn">
+      <Card title="Set per muskelgrupp och vecka" sub="Snitt senaste 4 veckorna, tolkat från övningsnamn">
         {b.strength.length === 0 ? <Empty title="Inget underlag">Täckning och progression visas när det finns set med övning, vikt och repetitioner.</Empty> :
-          <BarChart data={coverage.map((c) => ({ label: c.group.split(" ")[0], values: { s: c.sets } }))} series={[{ id: "s", label: "Set", color: "var(--s-strength)" }]} height={150} />}
+          <BarChart data={coverage.map((c) => ({ label: c.group.split(" ")[0], values: { s: c.perWeek } }))} series={[{ id: "s", label: "Set/vecka", color: "var(--s-strength)" }]} yFormat={(v) => fmt(v, 1)} height={150} />}
       </Card>
       {progress.slice(0, 6).map((p) => (
         <Card title={p.exercise} sub={`Uppskattat 1RM (Epley), senaste 12 veckorna · ${p.sessions.length} pass${p.changePct != null ? ` · ${p.changePct >= 0 ? "+" : ""}${fmt(p.changePct, 1)} %` : ""}`}>

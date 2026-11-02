@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays, clockMinutesAroundMidnight, isoWeek, localEpochToWallClock, range, todayStockholm, weekStart } from "../src/core/dates";
 import { sleepWindow } from "../src/core/sleep";
-import { assessRecovery } from "../src/core/recovery";
+import { SCORE_BAND, assessRecovery } from "../src/core/recovery";
 import { minimalSession, suggestToday, type CoachInput } from "../src/core/coach";
 import { proposePlan, templateWeek, viewPlan } from "../src/core/plan";
 import { checkGoal, weightChange, weightTrend } from "../src/core/body";
@@ -103,8 +103,19 @@ describe("recovery assessment", () => {
     const r = assessRecovery({ today: TODAY, wellness: normalWeeks({ [TODAY]: { sleepS: 4.6 * 3600 } }), activities: [], profile, checkin: checkin({ energy: 5 }) });
     expect(r.category).toBe("normal");
   });
+  it("gives a readiness score that matches the category", () => {
+    const good = assessRecovery({ today: TODAY, wellness: normalWeeks(), activities: [], profile, checkin: checkin({ energy: 5 }) });
+    const tired = assessRecovery({ today: TODAY, wellness: normalWeeks(), activities: [], profile, checkin: checkin({ energy: 2 }) });
+    const [lo, hi] = SCORE_BAND[good.category];
+    expect(good.score).toBeGreaterThanOrEqual(lo);
+    expect(good.score).toBeLessThanOrEqual(hi);
+    expect(tired.score).toBeGreaterThanOrEqual(SCORE_BAND.easy[0]);
+    expect(tired.score).toBeLessThanOrEqual(SCORE_BAND.easy[1]);
+    expect(good.score!).toBeGreaterThan(tired.score!);
+  });
   it("is uncertain without data", () => {
     const r = assessRecovery({ today: TODAY, wellness: [], activities: [], profile });
+    expect(r.score).toBeNull();
     expect(r.confidence).toBe("låg");
     expect(r.signals.filter((s) => s.state === "unknown").length).toBeGreaterThanOrEqual(3);
   });

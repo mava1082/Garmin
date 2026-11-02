@@ -46,6 +46,7 @@ export function dataHealth(b: DataBundle): DataHealth {
   if (b.mode === "real") {
     if (!today?.sleepS) missing.push("nattens sömn");
     if (!today?.hrvLastNight) missing.push("nattens HRV");
+    if (today?.sleepS && today.sleepScore == null) missing.push("sömnpoäng");
     if (!b.wellness.some((w) => w.date >= addDays(b.today, -1) && w.restingHr != null)) missing.push("vilopuls");
   }
   return { stale, lastSync: last, missing };

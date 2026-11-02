@@ -21,6 +21,8 @@ export interface RecoveryAssessment {
   title: string;
   summary: string;
   confidence: "hög" | "medel" | "låg";
+  /** 0–100, always inside the band of `category`; null when there is nothing to base it on. */
+  score: number | null;
   signals: Signal[];
   disclaimer: string;
 }
@@ -169,7 +171,24 @@ export function assessRecovery(input: {
   }[category];
   if (known.length < 2) summary += " Underlaget är tunt, så bedömningen är osäker.";
 
-  return { category, title: CATEGORY_TITLE[category], summary, confidence, signals: [...subjective, ...objective], disclaimer: DISCLAIMER };
+  return { category, title: CATEGORY_TITLE[category], summary, confidence, score: readinessScore(category, objective, subjective, checkin), signals: [...subjective, ...objective], disclaimer: DISCLAIMER };
+}
+
+/** Score bands per category, so the number never contradicts the verbal assessment. */
+export const SCORE_BAND: Record<RecoveryCategory, [number, number]> = { ready: [80, 100], normal: [60, 79], easy: [35, 59], recover: [5, 34] };
+const POINTS: Record<SignalState, number> = { ok: 100, watch: 60, strain: 25, unknown: 0 };
+const WEIGHT: Partial<Record<Signal["key"], number>> = { hrv: 0.35, sleep: 0.3, rhr: 0.25, load: 0.1, soreness: 0.15, stress: 0.15, pain: 0.2 };
+
+/** Weighted mean of the signals that exist, placed inside the category's band. */
+function readinessScore(category: RecoveryCategory, objective: Signal[], subjective: Signal[], checkin?: CheckIn): number | null {
+  const parts: [number, number][] = [...objective, ...subjective]
+    .filter((s) => s.state !== "unknown" && WEIGHT[s.key] != null)
+    .map((s) => [POINTS[s.state], WEIGHT[s.key]!]);
+  if (checkin?.energy != null) parts.push([checkin.energy * 20, 0.3]);
+  if (!objective.some((s) => s.state !== "unknown" && s.key !== "load") && checkin?.energy == null) return null;
+  const raw = parts.reduce((a, [p, w]) => a + p * w, 0) / parts.reduce((a, [, w]) => a + w, 0);
+  const [lo, hi] = SCORE_BAND[category];
+  return Math.round(Math.min(hi, Math.max(lo, raw)));
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

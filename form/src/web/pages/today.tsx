@@ -3,7 +3,7 @@ import { addDays, formatDay, formatDuration, range, weekStart, weekdayName } fro
 import { effectivePlan, viewPlan } from "../../core/plan";
 import { mean, round } from "../../core/stats";
 import type { CheckIn, Modality, PainArea, SessionKind } from "../../core/types";
-import { Sparkline } from "../components/charts";
+import { Ring, Sparkline } from "../components/charts";
 import { Icon, Notice, PageHead, Seg, Sheet, fmt, useAsync } from "../components/ui";
 import { WorkoutDetails, kindLabel } from "../components/workout";
 import { brief, dataHealth, greeting, suggestion, syncText, weightSummary } from "../engine";
@@ -18,7 +18,6 @@ export function Today() {
   const [swap, setSwap] = useState<{ kind: SessionKind; modality: Modality | null } | null>(null);
   const [sheet, setSheet] = useState<"workout" | "swap" | "recovery" | null>(null);
   const s = useMemo(() => suggestion(b, { minutes: minutes ?? undefined, kind: swap?.kind, modality: swap?.modality }), [b, minutes, swap]);
-  const health = dataHealth(b);
   const w = s.workout;
   const r = s.recovery;
 
@@ -32,10 +31,16 @@ export function Today() {
           <section class="hero">
             <p class="eyebrow">Dagens läge</p>
             <p class="brief">{brief(b, s)}</p>
-            <button class={`state ${CAT_CLASS[r.category]}`} onClick={() => setSheet("recovery")} aria-label={`${r.title}, säkerhet ${r.confidence}. Visa underlag.`}>
-              <span class="dot" />{r.title}<span class="conf">· {r.confidence} säkerhet</span>
+            <button class="readiness" onClick={() => setSheet("recovery")} aria-label={`Träningsredo ${r.score ?? "okänt"} av 100. ${r.title}, säkerhet ${r.confidence}. Visa underlag.`}>
+              <Ring value={r.score} color={RING_COLOR[r.category]} label="Träningsredo" />
+              <span class="r-side">
+                <span class="small muted">Träningsredo</span>
+                <span class={`state ${CAT_CLASS[r.category]}`}><span class="dot" />{r.title}</span>
+                <span class="tiny muted">{r.confidence} säkerhet · tryck för underlag</span>
+              </span>
             </button>
-            <p class="muted tiny" style="margin-top:8px">Appens uppskattning – inte Garmins Training Readiness.</p>
+            <MissingToday />
+            <p class="muted tiny" style="margin-top:10px">Appens uppskattning – inte Garmins Training Readiness.</p>
           </section>
 
           <section class="session">
@@ -68,13 +73,6 @@ export function Today() {
         </div>
       </div>
 
-      {(health.stale || health.missing.length > 0 || b.sync.lastError) && b.mode === "real" && (
-        <Notice>
-          {b.sync.lastError ? <>Senaste synken misslyckades: {b.sync.lastError} </> : null}
-          {health.stale && !b.sync.lastError ? "Data är äldre än sex timmar. " : null}
-          {health.missing.length > 0 && <>Saknas för idag: {health.missing.join(", ")}. Bedömningen görs utan dessa.</>}
-        </Notice>
-      )}
       <SyncLine />
 
       <Sheet open={sheet === "workout"} onClose={() => setSheet(null)} title={w.title}><WorkoutDetails s={s} /></Sheet>
@@ -98,6 +96,24 @@ export function Today() {
           </div>
         </div>
       </Sheet>
+    </div>
+  );
+}
+
+const RING_COLOR = { ready: "var(--good)", normal: "var(--good)", easy: "var(--attention)", recover: "var(--rest)" } as const;
+
+/** Prominent notice in the hero when today's data has not arrived (or the sync is failing). */
+function MissingToday() {
+  const b = useBundle();
+  const health = dataHealth(b);
+  if (b.mode !== "real" || (!health.stale && health.missing.length === 0 && !b.sync.lastError)) return null;
+  return (
+    <div class="missing" role="status">
+      <div class="m-title"><Icon name="info" size={18} />{health.missing.length ? "Dagens data saknas" : "Data kan vara gammal"}</div>
+      {health.missing.length > 0 && <ul>{health.missing.map((m) => <li>{m.charAt(0).toUpperCase() + m.slice(1)}</li>)}</ul>}
+      {b.sync.lastError && <p>Senaste synken misslyckades: {b.sync.lastError}</p>}
+      {health.stale && !b.sync.lastError && <p>Senaste lyckade synk är äldre än sex timmar.</p>}
+      <p>{health.missing.length ? "Bedömningen görs utan detta. " : ""}Öppna Garmin Connect så att klockan synkar – FORM hämtar ny data varannan timme, eller tryck Uppdatera längst ner.</p>
     </div>
   );
 }

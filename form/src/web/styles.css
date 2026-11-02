@@ -278,3 +278,18 @@ table.laps th:first-child, table.laps td:first-child { text-align: left; }
   .today-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
 }
 @media (min-width: 900px) { .today-grid .vitals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------------------------------------------------------------- readiness ring + missing data (Idag) */
+.readiness { display: flex; align-items: center; gap: 18px; margin-top: 18px; width: 100%; background: none; border: 0; padding: 0; color: inherit; text-align: left; font: inherit; }
+.readiness .state { margin-top: 0; }
+.readiness .r-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ring { position: relative; flex: none; }
+.ring svg { display: block; }
+.ring-fill { transition: stroke-dasharray 0.8s var(--ease); }
+.ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring-v { font-family: var(--font-display); font-size: 38px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.ring-l { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.missing { margin-top: 16px; border-radius: var(--radius-sm); padding: 12px 14px; background: var(--attention-soft); border: 1px solid rgba(233, 169, 71, 0.35); }
+.missing .m-title { font-weight: 600; color: var(--attention); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.missing ul { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--text); }
+.missing p { margin: 6px 0 0; font-size: 13px; color: var(--text-2); }

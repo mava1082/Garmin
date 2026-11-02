@@ -19,6 +19,8 @@ export function Recovery() {
   const hrvVals = dates.map((d) => w.get(d)?.hrvLastNight ?? null);
   const hrvRoll = rollingMean(b.wellness.filter((x) => x.date <= b.today).map((x) => x.hrvLastNight), 7, 3);
   const rollBy = new Map(b.wellness.filter((x) => x.date <= b.today).map((x, i) => [x.date, hrvRoll[i]]));
+  // Rolling mean over the period plus the six days before it, so the line starts on day one.
+  const scoreRoll = rollingMean(range(addDays(dates[0], -6), b.today).map((d) => w.get(d)?.sleepScore ?? null), 7, 3);
   const anyStress = dates.some((d) => w.get(d)?.stressAvg != null || w.get(d)?.bodyBatteryMax != null);
 
   return (
@@ -41,6 +43,12 @@ export function Recovery() {
             series={[{ id: "h", label: "Sömn", color: "var(--rest)" }]} yFormat={(v) => fmt(v, 1)}
             tooltipFooter={(i) => { const x = w.get(dates[i]); return x?.sleepS ? `${formatDay(dates[i])}${x.sleepScore ? ` · sömnpoäng ${x.sleepScore}` : ""}` : `${formatDay(dates[i])} · saknas`; }} />}
         <p class="tiny muted" style="margin-top:8px">Sömnfaser och sömnpoäng är klockans uppskattningar. Saknade nätter visas som tomma, inte som noll timmar sömn.</p>
+      </Card>
+
+      <Card title="Sömnpoäng" sub={`Garmins poäng 0–100 · linje = 7-dagarssnitt${s.avgScore != null ? ` · snitt ${fmt(s.avgScore)}` : ""}${prev.avgScore != null && s.avgScore != null ? ` (${s.avgScore >= prev.avgScore ? "+" : "−"}${fmt(Math.abs(s.avgScore - prev.avgScore))} mot förra perioden)` : ""}`}>
+        {!dates.some((d) => w.get(d)?.sleepScore != null) ? <Empty title="Ingen sömnpoäng">Garmin har inte skickat någon sömnpoäng för perioden.</Empty> :
+          <LineChart data={dates.map((d, i) => ({ x: d, values: { n: w.get(d)?.sleepScore ?? null, r: scoreRoll[i + 6] } }))}
+            series={[{ id: "n", label: "Natt", color: "var(--rest)", dotsOnly: true }, { id: "r", label: "7-dagarssnitt", color: "var(--rest)", width: 2.2 }]} xFormat={xf} />}
       </Card>
 
       <Card title="Sovtider" sub="När du somnade och vaknade">

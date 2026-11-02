@@ -195,3 +195,19 @@ export function ZoneSplit({ low, mid, high }: { low: number; mid: number; high: 
     </div>
   );
 }
+
+/** Filled ring with a 0–100 value in the middle. `value` null shows an empty ring. */
+export function Ring({ value, color, size = 132, label }: { value: number | null; color: string; size?: number; label: string }) {
+  const stroke = 11, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  const frac = value == null ? 0 : Math.max(0, Math.min(100, value)) / 100;
+  return (
+    <div class="ring" style={`width:${size}px;height:${size}px`} role="img" aria-label={value == null ? `${label}: underlag saknas` : `${label}: ${value} av 100`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line-strong)" stroke-width={stroke} />
+        <circle class="ring-fill" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} stroke-width={stroke} stroke-linecap="round"
+          stroke-dasharray={`${c * frac} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <div class="ring-center"><div class="ring-v">{value ?? "–"}</div><div class="ring-l">{value == null ? "saknas" : "av 100"}</div></div>
+    </div>
+  );
+}
